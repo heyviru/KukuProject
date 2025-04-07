@@ -1,0 +1,6 @@
+openai
+faster-whisper
+pydub
+flask
+flask-cors
+python-dotenv

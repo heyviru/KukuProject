@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Story</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #storyText {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            min-height: 100px;
+        }
+        .choice {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .choice:hover {
+            background-color: #d4edda;
+        }
+        #audioControls {
+            margin-top: 20px;
+        }
+        #status {
+            margin-top: 10px;
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Interactive Story</h1>
+        
+        <div id="introSection">
+            <p>What kind of story would you like to hear?</p>
+            <button id="startBtn">Start Voice Interaction</button>
+            <div id="status">Press the button and speak your story idea</div>
+        </div>
+        
+        <div id="storySection" style="display: none;">
+            <div id="storyText"></div>
+            
+            <div id="choicesContainer"></div>
+            
+            <div id="audioControls">
+                <button id="playBtn">Play Narration</button>
+                <button id="stopBtn">Stop</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const startBtn = document.getElementById('startBtn');
+        const storySection = document.getElementById('storySection');
+        const storyText = document.getElementById('storyText');
+        const choicesContainer = document.getElementById('choicesContainer');
+        const playBtn = document.getElementById('playBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        
+        // Audio elements
+        let audioContext;
+        let currentAudio = null;
+        let storyData = {
+            currentScene: null,
+            choices: []
+        };
+        
+        // Initialize the app
+        init();
+        
+        function init() {
+            // Check for Web Audio API support
+            if (!(window.AudioContext || window.webkitAudioContext)) {
+                status.textContent = "Web Audio API is not supported in your browser";
+                startBtn.disabled = true;
+                return;
+            }
+            
+            // Check for microphone access
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                status.textContent = "Microphone access is not supported in your browser";
+                startBtn.disabled = true;
+                return;
+            }
+            
+            // Set up event listeners
+            startBtn.addEventListener('click', startVoiceInteraction);
+            playBtn.addEventListener('click', playNarration);
+            stopBtn.addEventListener('click', stopAudio);
+        }
+        
+        // Start voice interaction
+        async function startVoiceInteraction() {
+            try {
+                status.textContent = "Listening... Please speak your story idea";
+                
+                // Ask the user for voice input
+                const userPrompt = await captureVoiceInput();
+                
+                if (!userPrompt) {
+                    status.textContent = "No input detected. Please try again.";
+                    return;
+                }
+                
+                status.textContent = `You said: "${userPrompt}". Is this correct?`;
+                
+                // Confirm the prompt
+                const isCorrect = await confirmWithVoice("Did you say: " + userPrompt + "? Please say yes or no.");
+                
+                if (isCorrect) {
+                    status.textContent = "Generating your story...";
+                    startBtn.disabled = true;
+                    
+                    // Generate the initial story
+                    await generateStory(userPrompt);
+                    
+                    // Show the story section
+                    storySection.style.display = 'block';
+                    status.textContent = "Story ready!";
+                } else {
+                    status.textContent = "Let's try again. Press the button and speak your story idea";
+                }
+            } catch (error) {
+                console.error("Error in voice interaction:", error);
+                status.textContent = "An error occurred. Please try again.";
+            }
+        }
+        
+        // Capture voice input from user
+        async function captureVoiceInput() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const audioChunks = [];
+                const mediaRecorder = new MediaRecorder(stream);
+                
+                // Create a promise that resolves when recording stops
+                const recordingPromise = new Promise((resolve) => {
+                    mediaRecorder.addEventListener('stop', () => {
+                        resolve(audioChunks);
+                    });
+                });
+                
+                // Collect audio data
+                mediaRecorder.addEventListener('dataavailable', (event) => {
+                    audioChunks.push(event.data);
+                });
+                
+                // Start recording
+                mediaRecorder.start();
+                
+                // Stop after 5 seconds or when user stops manually
+                setTimeout(() => {
+                    if (mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                    }
+                }, 5000);
+                
+                // Wait for recording to complete
+                const chunks = await recordingPromise;
+                
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+                
+                if (chunks.length === 0) {
+                    return null;
+                }
+                
+                // Create audio blob and send to server for processing
+                const audioBlob = new Blob(chunks, { type: 'audio/wav' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.wav');
+                
+                const response = await fetch('/api/process_voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                return data.text;
+            } catch (error) {
+                console.error("Error capturing voice:", error);
+                return null;
+            }
+        }
+        
+        // Confirm something with the user via voice
+        async function confirmWithVoice(message) {
+            // First, speak the message to the user
+            await speak(message);
+            
+            // Then capture their response
+            const response = await captureVoiceInput();
+            
+            if (!response) {
+                return false;
+            }
+            
+            // Check if response contains "yes"
+            return response.toLowerCase().includes('yes');
+        }
+        
+        // Generate the initial story
+        async function generateStory(prompt) {
+            try {
+                const response = await fetch('/api/generate_story', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prompt })
+                });
+                
+                const data = await response.json();
+                console.log("Hi");
+                console.log(data.text);
+                console.log(data.audio_url);
+                const audioData = await getDataAudio(data.audio_url);
+                const xyz = URL.createObjectURL(audioData);
+                console.log(xyz);
+                //data.audioUrl = xyz;
+
+                // Save the story data
+                storyData.currentScene = {
+                    text: data.text,
+                    audioUrl: xyz
+                };
+                
+                // Display the story
+                storyText.textContent = data.text;
+                
+                // Generate choices
+                await generateChoicesForCurrentScene();
+            } catch (error) {
+                console.error("Error generating story:", error);
+                throw error;
+            }
+        }
+
+        async function getDataAudio(abc) {
+            let data=null;
+            try {
+                const response = await fetch(abc);
+                data = await response.blob();
+            }
+            catch(error){
+                console.error("Error fetching data:", error);
+                throw error;
+            }
+            //console.log(data);
+            return data;
+        }
+        
+        // Generate choices for the current scene
+        async function generateChoicesForCurrentScene() {
+            try {
+                const response = await fetch('/api/generate_choices', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ story: storyData.currentScene.text })
+                });
+                
+                const data = await response.json();
+                storyData.choices = data.choices;
+                
+                // Display the choices
+                displayChoices();
+            } catch (error) {
+                console.error("Error generating choices:", error);
+                throw error;
+            }
+        }
+        
+        // Display the choices to the user
+        function displayChoices() {
+            choicesContainer.innerHTML = '';
+            
+            Object.keys(storyData.choices).forEach((choiceKey, index) => {
+                const choice = storyData.choices[choiceKey];
+                const choiceDiv = document.createElement('div');
+                choiceDiv.className = 'choice';
+                choiceDiv.textContent = `${index + 1}. ${choice.text}`;
+                
+                choiceDiv.addEventListener('click', () => {
+                    handleChoiceSelection(choiceKey);
+                });
+                
+                choicesContainer.appendChild(choiceDiv);
+            });
+        }
+        
+        // Handle user's choice selection
+        async function handleChoiceSelection(choiceKey) {
+            try {
+                status.textContent = "Continuing the story...";
+                
+                const response = await fetch('/api/continue_story', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        story: storyData.currentScene.text,
+                        choice: storyData.choices[choiceKey].text
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Update the story data
+                storyData.currentScene = {
+                    text: data.text,
+                    audioUrl: data.audioUrl
+                };
+                
+                // Display the new story segment
+                storyText.textContent = data.text;
+
+
+                
+                // Generate new choices
+                await generateChoicesForCurrentScene();
+                
+                status.textContent = "Story updated!";
+            } catch (error) {
+                console.error("Error continuing story:", error);
+                status.textContent = "An error occurred. Please try again.";
+            }
+        }
+        
+        // Play the current narration
+        async function playNarration() {
+            console.log(storyData.currentScene.audioUrl);
+            if (!storyData.currentScene.audioUrl) {
+                status.textContent = "No audio available to play";
+                return;
+            } 
+            
+            try {
+                stopAudio(); // Stop any currently playing audio
+                
+                status.textContent = "Playing narration...";
+                
+                // Fetch the audio file
+                const response = await fetch(storyData.currentScene.audioUrl);
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Play the audio
+                currentAudio = new Audio(audioUrl);
+                currentAudio.play();
+                
+                currentAudio.addEventListener('ended', () => {
+                    status.textContent = "Narration complete";
+                    currentAudio = null;
+                });
+            } catch (error) {
+                console.error("Error playing narration:", error);
+                status.textContent = "Failed to play audio";
+            }
+        }
+        
+        // Stop currently playing audio
+        function stopAudio() {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
+                status.textContent = "Playback stopped";
+            }
+        }
+        
+        // Speak text using the Web Speech API
+        function speak(text) {
+            return new Promise((resolve) => {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.onend = resolve;
+                    speechSynthesis.speak(utterance);
+                } else {
+                    // Fallback if speech synthesis isn't available
+                    console.log("Speech synthesis not available");
+                    resolve();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
