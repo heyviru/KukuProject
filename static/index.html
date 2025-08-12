@@ -68,8 +68,12 @@
         
         <div id="introSection">
             <p>What kind of story would you like to hear?</p>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                <input id="promptInput" type="text" placeholder="Type your prompt (e.g., calm forest walk)" style="flex:1; padding:8px;" />
+                <button id="generateBtn">Generate</button>
+            </div>
             <button id="startBtn">Start Voice Interaction</button>
-            <div id="status">Press the button and speak your story idea</div>
+            <div id="status">Speak or type your story idea</div>
         </div>
         
         <div id="storySection" style="display: none;">
@@ -93,6 +97,8 @@
         const playBtn = document.getElementById('playBtn');
         const stopBtn = document.getElementById('stopBtn');
         const status = document.getElementById('status');
+        const promptInput = document.getElementById('promptInput');
+        const generateBtn = document.getElementById('generateBtn');
         
         // Audio elements
         let audioContext;
@@ -122,6 +128,26 @@
             
             // Set up event listeners
             startBtn.addEventListener('click', startVoiceInteraction);
+            generateBtn.addEventListener('click', async () => {
+                const prompt = promptInput.value.trim();
+                if (!prompt) {
+                    status.textContent = 'Please enter a prompt';
+                    return;
+                }
+                status.textContent = 'Generating your story...';
+                startBtn.disabled = true;
+                generateBtn.disabled = true;
+                try {
+                    await generateStory(prompt);
+                    storySection.style.display = 'block';
+                    status.textContent = 'Story ready!';
+                } catch (e) {
+                    status.textContent = 'Failed to generate story';
+                } finally {
+                    startBtn.disabled = false;
+                    generateBtn.disabled = false;
+                }
+            });
             playBtn.addEventListener('click', playNarration);
             stopBtn.addEventListener('click', stopAudio);
         }
@@ -246,20 +272,17 @@
                     },
                     body: JSON.stringify({ prompt })
                 });
-                
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({ error: 'Server error' }));
+                    throw new Error(err.error || 'Failed to generate story');
+                }
                 const data = await response.json();
-                console.log("Hi");
                 console.log(data.text);
                 console.log(data.audio_url);
-                const audioData = await getDataAudio(data.audio_url);
-                const xyz = URL.createObjectURL(audioData);
-                console.log(xyz);
-                //data.audioUrl = xyz;
-
-                // Save the story data
+                // Save the story data (use direct URL from server)
                 storyData.currentScene = {
                     text: data.text,
-                    audioUrl: xyz
+                    audioUrl: data.audio_url
                 };
                 
                 // Display the story
@@ -297,7 +320,10 @@
                     },
                     body: JSON.stringify({ story: storyData.currentScene.text })
                 });
-                
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({ error: 'Server error' }));
+                    throw new Error(err.error || 'Failed to generate choices');
+                }
                 const data = await response.json();
                 storyData.choices = data.choices;
                 
@@ -342,13 +368,16 @@
                         choice: storyData.choices[choiceKey].text
                     })
                 });
-                
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({ error: 'Server error' }));
+                    throw new Error(err.error || 'Failed to continue story');
+                }
                 const data = await response.json();
                 
                 // Update the story data
                 storyData.currentScene = {
                     text: data.text,
-                    audioUrl: data.audioUrl
+                    audioUrl: data.audio_url
                 };
                 
                 // Display the new story segment

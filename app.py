@@ -1,34 +1,37 @@
-#IMPORTS
+"""Flask app for interactive story generation and audio mixing."""
+
+# IMPORTS
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  #Disable GPU detection
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable GPU detection
 import io
-import re
 import json
+import tempfile
 from datetime import datetime
 from math import ceil
-from openai import OpenAI
-from faster_whisper import WhisperModel
-from pydub import AudioSegment
-from flask import Flask, request, jsonify, send_file
-import tempfile
-import openai
+from pathlib import Path
+
 from dotenv import load_dotenv
+from faster_whisper import WhisperModel
+from openai import OpenAI
+from pydub import AudioSegment
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
-from pathlib import Path
 
 #Get the absolute path to the directory containing app.py.
 base_dir = Path(__file__).parent
 
-#Load environment variables from key.env in the same directory.
+# Load environment variables from key.env in the same directory.
 env_path = base_dir / "key.env"
 load_dotenv(env_path)
 
-#Initialize OpenAI client.
+# Initialize OpenAI client.
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
-    raise ValueError("OPENAI_API_KEY not found in key.env")
-client = OpenAI(api_key=api_key)
+    raise ValueError("OPENAI_API_KEY not configured. Set environment variable or add it to key.env")
+try:
+    client = OpenAI(api_key=api_key, timeout=30.0)
+except TypeError:
+    client = OpenAI(api_key=api_key)
 
 app = Flask(__name__, static_folder='static')
 CORS(app)  #Enable CORS for all routes.
@@ -107,33 +110,56 @@ SFX_KEYWORDS = {
 
 MIN_SEGMENT_DURATION = 20 #Minimum segment duration in seconds
 
+# --- Global caches for performance ---
+WHISPER_TINY = None
+WHISPER_BASE = None
+_AUDIO_ASSETS_CACHE = {"bgm": None, "sfx": None}
+
+def get_whisper_model(size: str) -> WhisperModel:
+    global WHISPER_TINY, WHISPER_BASE
+    if size == "tiny":
+        if WHISPER_TINY is None:
+            WHISPER_TINY = WhisperModel(
+                "tiny",
+                device="cpu",
+                compute_type="int8",
+            )
+        return WHISPER_TINY
+    if size == "base":
+        if WHISPER_BASE is None:
+            WHISPER_BASE = WhisperModel(
+                "base",
+                device="cpu",
+                compute_type="int8",
+            )
+        return WHISPER_BASE
+    # default
+    return get_whisper_model("tiny")
+
 def process_voice_input(audio_file):
-    """Transcribe user's voice input to text (CPU-only version)"""
+    """Transcribe user's voice input to text (CPU-only version)."""
+    tmp_path = None
     try:
-        #Initialize model (CPU-only).
-        model = WhisperModel(
-            "base", 
-            device="cpu",
-            compute_type="int8",
-            cpu_threads=4
-        )
-        
-        #Save temporary audio file
+        model = get_whisper_model("base")
+
+        # Save temporary audio file
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
             audio_file.save(tmp.name)
             tmp_path = tmp.name
-        
+
         # Transcribe
         segments, _ = model.transcribe(tmp_path)
         text = " ".join([seg.text for seg in segments])
-        
-        # Clean up
-        os.unlink(tmp_path)
-        
         return text.strip()
     except Exception as e:
         print(f"CPU Voice processing error: {e}")
         return None
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 @app.route('/api/process_voice', methods=['POST'])
 
@@ -149,6 +175,18 @@ def handle_voice():
     
     return jsonify({"text": text})
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    try:
+        bgm, sfx = load_audio_assets()
+        return jsonify({
+            "status": "ok",
+            "bgm_loaded": len([k for k, v in bgm.items() if v]),
+            "sfx_loaded": len([k for k, v in sfx.items() if v]),
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "detail": str(e)[:200]}), 500
+
 @app.route('/api/generate_story', methods=['POST'])
 def generate_story():
     data = request.json
@@ -157,15 +195,26 @@ def generate_story():
     if not prompt:
         return jsonify({"error": "No prompt provided"}), 400
     
-    #Your existing story generation logic
+    # Generate story text
     scene = generate_text(f"Write a 3-paragraph story introduction about: {prompt}")
+    if not scene:
+        return jsonify({"error": "Text generation failed"}), 502
+
+    # Generate speech
     audio_data = generate_speech(scene)
-    
-    #Save files and process
-    text_path, audio_path = save_files(scene, audio_data, "intro")
+
+    # Save files and process
+    _, audio_path = save_files(scene, audio_data, "intro")
+    if not audio_path or not os.path.exists(audio_path):
+        return jsonify({"error": "Audio synthesis failed"}), 502
+
+    # Transcribe, enrich and create final mix with BGM/SFX
     enriched_data = transcribe_and_enrich(audio_path)
-    final_path = save_final_output(audio_path, enriched_data, f"intro_{audio_path.split('_')[-1].replace('.mp3','')}")
-    
+    audio_basename = os.path.basename(audio_path).replace('.mp3', '')
+    final_path = save_final_output(audio_path, enriched_data, f"intro_{audio_basename}")
+    if not final_path or not os.path.exists(final_path):
+        return jsonify({"error": "Failed to render final audio"}), 500
+
     return jsonify({
         "text": scene,
         "audio_url": f"/api/audio/{os.path.basename(final_path)}"
@@ -186,8 +235,9 @@ def serve_audio(filename):
 def generate_text(prompt):
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -210,7 +260,7 @@ def generate_speech(text, voice="alloy"):
 def save_files(content, audio_data, prefix):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     text_path = os.path.join(TEXT_DIR, f"{prefix}_{timestamp}.txt")
-    audio_path = os.path.join(AUDIO_DIR, f"{prefix}_{timestamp}.mp3")
+    audio_path = None
 
     if content:
         with open(text_path, 'w', encoding='utf-8') as f:
@@ -218,14 +268,16 @@ def save_files(content, audio_data, prefix):
 
     if audio_data:
         try:
+            audio_path = os.path.join(AUDIO_DIR, f"{prefix}_{timestamp}.mp3")
             audio = AudioSegment.from_file(audio_data, format="mp3")
             audio.export(audio_path, format="mp3")
         except Exception as e:
             print(f"Audio save failed: {e}")
+            audio_path = None
 
     return text_path, audio_path
 
-#CHOICE GENERATION
+# CHOICE GENERATION
 def generate_choices(scene):
     if not scene:
         return {
@@ -252,11 +304,11 @@ def generate_choices(scene):
             "choice2": {"text": "Try different approach", "hint": "curious"}
         }
 
-#MOOD & SFX DETECTION
+# MOOD & SFX DETECTION
 def detect_mood(text):
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[{"role": "system", "content": "Return only one of: suspense, space, sad, romantic, relaxing, mystery, lofi, horror, happy, funny, fantasy, epic, emotional, dramatic, battle, action"},
                       {"role": "user", "content": f"What is the mood of this narration?\n\n{text}"}],
             max_tokens=5,
@@ -269,22 +321,32 @@ def detect_mood(text):
 
 def detect_sfx(words):
     matches = []
+    if not words:
+        return matches
+
     for word_data in words:
-        word = word_data.word.lower()
-        timestamp = word_data.start
+        word = getattr(word_data, 'word', '')
+        if not word:
+            continue
+        word = word.lower()
+        timestamp = getattr(word_data, 'start', 0) or 0
         for sfx, keywords in SFX_KEYWORDS.items():
-            if word in keywords:
+            if any(kw in word for kw in keywords):
                 matches.append({
                     "file": SFX_PATHS[sfx],
-                    "timestamp": round(timestamp, 2)
+                    "timestamp": round(timestamp, 2),
+                    "word": word,
+                    "sfx_name": sfx
                 })
-                print(f"🔊 Detected: {word} → {sfx}.mp3 at {timestamp:.2f}s")
+                print(f"🔊 Detected SFX: Word '{word}' → {sfx}.mp3 at {timestamp:.2f}s")
                 break
     return matches
 
-#TRANSCRIBE & ENRICH AUDIO
+# TRANSCRIBE & ENRICH AUDIO
 def transcribe_and_enrich(audio_path):
-    model = WhisperModel("tiny")
+    if not audio_path or not os.path.exists(audio_path):
+        raise FileNotFoundError(f"Audio file not found for transcription: {audio_path}")
+    model = get_whisper_model("tiny")
     segments, _ = model.transcribe(audio_path, word_timestamps=True)
 
     transcribed_chunks = [{
@@ -328,30 +390,13 @@ def transcribe_and_enrich(audio_path):
         })
     return enriched
 
-#AUDIO PROCESSING FUNCTIONS
-
-def detect_sfx(words):
-    matches = []
-    if not words:
-        return matches
-
-    for word_data in words:
-        word = word_data.word.lower()
-        timestamp = word_data.start
-        for sfx, keywords in SFX_KEYWORDS.items():
-            if any(kw in word for kw in keywords):
-                matches.append({
-                    "file": SFX_PATHS[sfx],
-                    "timestamp": round(timestamp, 2),
-                    "word": word,
-                    "sfx_name": sfx
-                })
-                print(f"🔊 Detected SFX: Word '{word}' → {sfx}.mp3 at {timestamp:.2f}s")
-                break
-    return matches
+# AUDIO PROCESSING FUNCTIONS
 
 def load_audio_assets():
-    """Load all BGM and SFX files with processing"""
+    """Load all BGM and SFX files with processing (cached)."""
+    if _AUDIO_ASSETS_CACHE["bgm"] is not None and _AUDIO_ASSETS_CACHE["sfx"] is not None:
+        return _AUDIO_ASSETS_CACHE["bgm"], _AUDIO_ASSETS_CACHE["sfx"]
+
     bgm_files = {}
     sfx_files = {}
 
@@ -382,6 +427,8 @@ def load_audio_assets():
         else:
             print(f"⚠️ Missing SFX file: {path}")
 
+    _AUDIO_ASSETS_CACHE["bgm"] = bgm_files
+    _AUDIO_ASSETS_CACHE["sfx"] = sfx_files
     return bgm_files, sfx_files
 
 def create_final_mix(audio_path, timeline):
@@ -503,12 +550,10 @@ def create_final_mix(audio_path, timeline):
         traceback.print_exc()
         return AudioSegment.from_file(audio_path)
 
-
-
 def save_final_output(audio_path, timeline, prefix):
     print(f"\n=== Saving Final Output ===")
     print(f"Input audio path: {audio_path}")
-    print(f"Exists? {os.path.exists(audio_path)}")
+    print(f"Exists? {os.path.exists(audio_path) if audio_path else False}")
     print(f"Final dir: {FINAL_DIR}")
     print(f"Final dir exists? {os.path.exists(FINAL_DIR)}")
     
@@ -517,9 +562,6 @@ def save_final_output(audio_path, timeline, prefix):
         return None
 
     print(f"Checking if source audio exists: {audio_path}")  # Debug
-    if not audio_path or not os.path.exists(audio_path):
-        print(f"❌ Source audio not found at: {audio_path}")
-        return None
 
     final_audio = create_final_mix(audio_path, timeline)
     
@@ -610,13 +652,22 @@ def continue_story():
     
     next_scene = generate_text(f"Continue the story after choosing: {choice}\n\n"
                              f"Previous:\n{previous_story}\n\nWrite 2-3 more paragraphs.")
+    if not next_scene:
+        return jsonify({"error": "Text generation failed"}), 502
+
     audio_data = generate_speech(next_scene)
     
     # Save files and process (using your existing functions)
     prefix = f"continuation_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    text_path, audio_path = save_files(next_scene, audio_data, prefix)
+    _, audio_path = save_files(next_scene, audio_data, prefix)
+    if not audio_path or not os.path.exists(audio_path):
+        return jsonify({"error": "Audio synthesis failed"}), 502
+
+    # Transcribe, enrich and create final mix with BGM/SFX
     enriched_data = transcribe_and_enrich(audio_path)
     final_path = save_final_output(audio_path, enriched_data, prefix)
+    if not final_path or not os.path.exists(final_path):
+        return jsonify({"error": "Failed to render final audio"}), 500
     
     return jsonify({
         "text": next_scene,
@@ -625,4 +676,11 @@ def continue_story():
 
 # --- RUN ---
 if __name__ == "__main__":
-    app.run(port=5000)
+    host = os.getenv("HOST", "127.0.0.1")
+    port_str = os.getenv("PORT", "5000")
+    try:
+        port = int(port_str)
+    except ValueError:
+        port = 5000
+    debug = os.getenv("FLASK_DEBUG", "0") == "1"
+    app.run(host=host, port=port, debug=debug)
