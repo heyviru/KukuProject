@@ -1,95 +1,205 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Story</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>audioleap.ai — Leap into immersive audio experiences</title>
+  <meta name="description" content="Automated narration, contextual SFX, mood BGM, and timestamp‑aware mixing — refined every time." />
+  <meta property="og:image" content="/static/logo.jpg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            margin: 5px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        #storyText {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            min-height: 100px;
-        }
-        .choice {
-            margin: 10px 0;
-            padding: 10px;
-            background-color: #e9f7ef;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .choice:hover {
-            background-color: #d4edda;
-        }
-        #audioControls {
-            margin-top: 20px;
-        }
-        #status {
-            margin-top: 10px;
-            font-style: italic;
-            color: #666;
-        }
+    :root{
+      --violet:#6e3adb; --teal:#2dd4bf; --ink:#0f0b1a; --ink-2:#171225;
+      --text:#eae6f3; --muted:#b8b3c9; --border:rgba(255,255,255,.12);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--text);
+      background:var(--ink);
+      font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+    /* Parallax blobs */
+    .blob{position:fixed; inset:auto; filter:blur(80px); opacity:.35; z-index:-1; pointer-events:none; will-change:transform}
+    .blob.violet{background:#7c3aed; width:420px; height:420px; border-radius:50%; top:-120px; left:-120px}
+    .blob.teal{background:#14b8a6; width:520px; height:520px; border-radius:50%; bottom:-160px; right:-120px}
+
+    /* Layout */
+    .wrap{max-width:900px; margin:0 auto; padding:24px 20px 64px}
+    .nav{position:sticky; top:0; backdrop-filter:saturate(120%) blur(8px); background:linear-gradient(to bottom, rgba(10,8,20,.65), rgba(10,8,20,.2)); border-bottom:1px solid var(--border); z-index:10}
+    .nav-in{max-width:900px; margin:0 auto; padding:12px 20px; display:flex; align-items:center; justify-content:space-between}
+    .brand{display:flex; gap:12px; align-items:center}
+    .brand img{width:36px; height:36px; border-radius:10px; object-fit:cover; border:1px solid var(--border)}
+    .brand span{font:700 18px 'Space Grotesk',sans-serif; letter-spacing:.2px}
+    .cta{display:flex; gap:10px}
+    .btn{padding:12px 16px; border-radius:12px; font-weight:600; border:1px solid var(--border); background:rgba(255,255,255,.06); color:var(--text); cursor:pointer}
+    .btn.primary{border-color:transparent; background:linear-gradient(135deg, var(--violet), var(--teal)); color:#fff}
+
+    /* Hero */
+    .hero{padding:48px 0 12px}
+    .kicker{display:inline-block; padding:6px 10px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-weight:600; font-size:12px; letter-spacing:.3px}
+    h1{font:700 48px 'Space Grotesk',sans-serif; line-height:1.06; margin:14px 0 10px}
+    .grad{background:linear-gradient(135deg,#a78bfa 0%,#2dd4bf 100%); -webkit-background-clip:text; background-clip:text; color:transparent}
+    .lead{color:var(--muted); font-size:18px; line-height:1.7; margin:0}
+    .hero-cta{margin-top:22px; display:flex; gap:12px; flex-wrap:wrap}
+
+    /* Sections */
+    section{padding:44px 0; border-top:1px solid var(--border)}
+    h2{font:700 26px 'Space Grotesk',sans-serif; margin:0 0 12px}
+    p{color:var(--muted); font-size:16px; line-height:1.85; margin:10px 0}
+    ul{margin:12px 0 0 0; padding:0; list-style:none}
+    li{display:flex; align-items:flex-start; gap:10px; margin:10px 0}
+    .dot{width:8px; height:8px; margin-top:10px; border-radius:50%; background:linear-gradient(135deg,var(--violet),var(--teal))}
+
+    .foot{text-align:center; color:var(--muted); padding-top:32px}
+
+    /* Modal demo (kept minimal) */
+    .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(6,5,12,.6); backdrop-filter:blur(6px); z-index:50}
+    .modal.show{display:flex}
+    .card{width:min(820px,92vw); max-height:90vh; overflow:auto; border:1px solid var(--border); background:rgba(23,18,37,.96); border-radius:16px}
+    .card-h{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border)}
+    .close{background:transparent; border:none; color:var(--muted); font-size:20px; cursor:pointer}
+    .card-b{padding:14px}
+
+    /* Inline demo styles overrides */
+    .container{background:transparent; padding:0; box-shadow:none}
+    .choice{background:#1e1a33; padding:10px; border-radius:8px}
+    #storyText{background:#17132a; padding:12px; border-radius:10px}
+
+    @media (max-width:640px){h1{font-size:36px}}
     </style>
 </head>
 <body>
+  <div class="blob violet" id="blobV"></div>
+  <div class="blob teal" id="blobT"></div>
+
+  <header class="nav">
+    <div class="nav-in">
+      <div class="brand">
+        <img src="/static/logo.jpg" alt="audioleap.ai" onerror="this.style.display='none'" />
+        <span>audioleap.ai</span>
+      </div>
+      <div class="cta">
+        <button class="btn" id="openDemoTop">Launch demo</button>
+        <a class="btn primary" href="mailto:hi@audioleap.ai">Get early access</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker">Leap into immersive audio experiences</span>
+      <h1>Re‑imagining audio production for creators — <span class="grad">fully automated</span>.</h1>
+      <p class="lead">We automate narration, ambience and SFX, mood‑aware BGM, and timestamp‑level mixing so your output is polished every single time.</p>
+      <div class="hero-cta">
+        <button class="btn primary" id="openDemo">Launch demo</button>
+        <a class="btn" href="#approach">Learn more</a>
+      </div>
+    </section>
+
+    <section id="challenge">
+      <h2>The challenge</h2>
+      <p>Creators, platforms and educators face high costs, slow turnaround and inconsistent quality. Audio defines 50–60% of the experience—yet most of it is still manual.</p>
+      <ul>
+        <li><span class="dot"></span><p>Cut production time from days to minutes.</p></li>
+        <li><span class="dot"></span><p>Achieve consistent, refined mixes at scale.</p></li>
+        <li><span class="dot"></span><p>Lower costs while improving quality.</p></li>
+      </ul>
+    </section>
+
+    <section id="approach">
+      <h2>Our approach</h2>
+      <p>We combine DIA model narration from Nari Labs, OpenAI for story generation and timestamps, and HuggingFace Transformers for NLP on the text. The system mimics an editor’s workflow and renders reliably in Python.</p>
+      <ul>
+        <li><span class="dot"></span><p>Lifelike narration → parse text and words.</p></li>
+        <li><span class="dot"></span><p>Mood‑aware BGM with tasteful fades and transitions.</p></li>
+        <li><span class="dot"></span><p>Contextual ambience and SFX placed exactly on cue.</p></li>
+        <li><span class="dot"></span><p>Final mix exported, share‑ready.</p></li>
+      </ul>
+    </section>
+
+    <section id="market">
+      <h2>Market</h2>
+      <p>Creator economy ~₹ 927M (India) and $32B (global) and growing. Audiobooks ~ $9B and expanding as Gen Z shifts away from screens. Sound quality decides up to 50–60% of content success.</p>
+    </section>
+
+    <section id="users">
+      <h2>Who it’s for</h2>
+      <ul>
+        <li><span class="dot"></span><p>Businesses: Audible, KukuFM, PocketFM…</p></li>
+        <li><span class="dot"></span><p>Creators: interactive stories, narrative reels and videos.</p></li>
+        <li><span class="dot"></span><p>Education: narrated modules with ambience.</p></li>
+        <li><span class="dot"></span><p>Consumers: interactive stories and games.</p></li>
+      </ul>
+    </section>
+
+    <section style="text-align:center">
+      <h2>Ready to leap?</h2>
+      <p class="lead" style="margin-top:6px">Try the interactive demo or get early access for your team.</p>
+      <div style="margin-top:14px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
+        <button class="btn primary" id="openDemoBottom">Launch demo</button>
+        <a class="btn" href="mailto:hi@audioleap.ai">Get early access</a>
+      </div>
+    </section>
+
+    <div class="foot">© <span id="year"></span> audioleap.ai</div>
+  </main>
+
+  <!-- Demo Modal (kept minimal, uses your existing endpoints) -->
+  <div class="modal" id="demoModal" aria-hidden="true" role="dialog">
+    <div class="card">
+      <div class="card-h"><strong>Interactive demo</strong><button class="close" id="closeDemo" aria-label="Close">✕</button></div>
+      <div class="card-b">
     <div class="container">
-        <h1>Interactive Story</h1>
-        
         <div id="introSection">
             <p>What kind of story would you like to hear?</p>
             <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
                 <input id="promptInput" type="text" placeholder="Type your prompt (e.g., calm forest walk)" style="flex:1; padding:8px;" />
-                <button id="generateBtn">Generate</button>
+              <button id="generateBtn" class="btn primary">Generate</button>
             </div>
-            <button id="startBtn">Start Voice Interaction</button>
+            <button id="startBtn" class="btn">Start Voice Interaction</button>
             <div id="status">Speak or type your story idea</div>
         </div>
-        
-        <div id="storySection" style="display: none;">
+          <div id="storySection" style="display:none;">
             <div id="storyText"></div>
-            
-            <div id="choicesContainer"></div>
-            
-            <div id="audioControls">
-                <button id="playBtn">Play Narration</button>
-                <button id="stopBtn">Stop</button>
+            <div id="choicesContainer" style="margin-top:10px"></div>
+            <div id="audioControls" style="margin-top:12px">
+              <button id="playBtn" class="btn primary">Play Narration</button>
+              <button id="stopBtn" class="btn">Stop</button>
+            </div>
+          </div>
             </div>
         </div>
     </div>
+  </div>
+
+  <script>
+    // Parallax: move blobs on scroll (subtle, performant)
+    const blobV = document.getElementById('blobV');
+    const blobT = document.getElementById('blobT');
+    const onScroll = () => {
+      const y = window.scrollY || 0;
+      blobV.style.transform = `translateY(${y*0.18}px)`;
+      blobT.style.transform = `translateY(${y*-0.12}px)`;
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive:true });
+
+    // Modal wiring
+    const modal = document.getElementById('demoModal');
+    const openBtns = [document.getElementById('openDemoTop'), document.getElementById('openDemo'), document.getElementById('openDemoBottom')].filter(Boolean);
+    const closeBtn = document.getElementById('closeDemo');
+    openBtns.forEach(b=>b.addEventListener('click',()=>{ modal.classList.add('show'); modal.setAttribute('aria-hidden','false'); ensureInit(); }));
+    closeBtn.addEventListener('click',()=>{ modal.classList.remove('show'); modal.setAttribute('aria-hidden','true'); });
+    document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') modal.classList.remove('show');});
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
 
     <script>
-        // DOM elements
+    // --- Existing demo logic (trimmed to essentials, unchanged behavior) ---
         const startBtn = document.getElementById('startBtn');
         const storySection = document.getElementById('storySection');
         const storyText = document.getElementById('storyText');
@@ -100,357 +210,94 @@
         const promptInput = document.getElementById('promptInput');
         const generateBtn = document.getElementById('generateBtn');
         
-        // Audio elements
-        let audioContext;
         let currentAudio = null;
-        let storyData = {
-            currentScene: null,
-            choices: []
-        };
-        
-        // Initialize the app
-        init();
-        
-        function init() {
-            // Check for Web Audio API support
-            if (!(window.AudioContext || window.webkitAudioContext)) {
-                status.textContent = "Web Audio API is not supported in your browser";
-                startBtn.disabled = true;
-                return;
-            }
-            
-            // Check for microphone access
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                status.textContent = "Microphone access is not supported in your browser";
-                startBtn.disabled = true;
-                return;
-            }
-            
-            // Set up event listeners
+    let storyData = { currentScene: null, choices: [] };
+
+    const ensureInit = () => { if (!startBtn._bound) { init(); startBtn._bound = true; } };
+
+    function init(){
+      if (!(window.AudioContext || window.webkitAudioContext)) { status.textContent = 'Web Audio API is not supported in your browser'; startBtn.disabled = true; return; }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status.textContent = 'Microphone access is not supported in your browser'; startBtn.disabled = true; return; }
             startBtn.addEventListener('click', startVoiceInteraction);
             generateBtn.addEventListener('click', async () => {
                 const prompt = promptInput.value.trim();
-                if (!prompt) {
-                    status.textContent = 'Please enter a prompt';
-                    return;
-                }
-                status.textContent = 'Generating your story...';
-                startBtn.disabled = true;
-                generateBtn.disabled = true;
-                try {
-                    await generateStory(prompt);
-                    storySection.style.display = 'block';
-                    status.textContent = 'Story ready!';
-                } catch (e) {
-                    status.textContent = 'Failed to generate story';
-                } finally {
-                    startBtn.disabled = false;
-                    generateBtn.disabled = false;
-                }
+        if (!prompt) { status.textContent = 'Please enter a prompt'; return; }
+        status.textContent = 'Generating your story...'; startBtn.disabled = true; generateBtn.disabled = true;
+        try { await generateStory(prompt); storySection.style.display = 'block'; status.textContent = 'Story ready!'; }
+        catch { status.textContent = 'Failed to generate story'; }
+        finally { startBtn.disabled = false; generateBtn.disabled = false; }
             });
             playBtn.addEventListener('click', playNarration);
             stopBtn.addEventListener('click', stopAudio);
         }
         
-        // Start voice interaction
-        async function startVoiceInteraction() {
-            try {
-                status.textContent = "Listening... Please speak your story idea";
-                
-                // Ask the user for voice input
+    async function startVoiceInteraction(){
+      try{
+        status.textContent = 'Listening... Please speak your story idea';
                 const userPrompt = await captureVoiceInput();
-                
-                if (!userPrompt) {
-                    status.textContent = "No input detected. Please try again.";
-                    return;
-                }
-                
+        if(!userPrompt){ status.textContent = 'No input detected. Please try again.'; return; }
                 status.textContent = `You said: "${userPrompt}". Is this correct?`;
-                
-                // Confirm the prompt
-                const isCorrect = await confirmWithVoice("Did you say: " + userPrompt + "? Please say yes or no.");
-                
-                if (isCorrect) {
-                    status.textContent = "Generating your story...";
-                    startBtn.disabled = true;
-                    
-                    // Generate the initial story
-                    await generateStory(userPrompt);
-                    
-                    // Show the story section
-                    storySection.style.display = 'block';
-                    status.textContent = "Story ready!";
-                } else {
-                    status.textContent = "Let's try again. Press the button and speak your story idea";
-                }
-            } catch (error) {
-                console.error("Error in voice interaction:", error);
-                status.textContent = "An error occurred. Please try again.";
-            }
-        }
-        
-        // Capture voice input from user
-        async function captureVoiceInput() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const audioChunks = [];
-                const mediaRecorder = new MediaRecorder(stream);
-                
-                // Create a promise that resolves when recording stops
-                const recordingPromise = new Promise((resolve) => {
-                    mediaRecorder.addEventListener('stop', () => {
-                        resolve(audioChunks);
-                    });
-                });
-                
-                // Collect audio data
-                mediaRecorder.addEventListener('dataavailable', (event) => {
-                    audioChunks.push(event.data);
-                });
-                
-                // Start recording
-                mediaRecorder.start();
-                
-                // Stop after 5 seconds or when user stops manually
-                setTimeout(() => {
-                    if (mediaRecorder.state !== 'inactive') {
-                        mediaRecorder.stop();
-                    }
-                }, 5000);
-                
-                // Wait for recording to complete
-                const chunks = await recordingPromise;
-                
-                // Stop all tracks
-                stream.getTracks().forEach(track => track.stop());
-                
-                if (chunks.length === 0) {
-                    return null;
-                }
-                
-                // Create audio blob and send to server for processing
-                const audioBlob = new Blob(chunks, { type: 'audio/wav' });
-                const formData = new FormData();
-                formData.append('audio', audioBlob, 'recording.wav');
-                
-                const response = await fetch('/api/process_voice', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                return data.text;
-            } catch (error) {
-                console.error("Error capturing voice:", error);
-                return null;
-            }
-        }
-        
-        // Confirm something with the user via voice
-        async function confirmWithVoice(message) {
-            // First, speak the message to the user
-            await speak(message);
-            
-            // Then capture their response
-            const response = await captureVoiceInput();
-            
-            if (!response) {
-                return false;
-            }
-            
-            // Check if response contains "yes"
-            return response.toLowerCase().includes('yes');
-        }
-        
-        // Generate the initial story
-        async function generateStory(prompt) {
-            try {
-                const response = await fetch('/api/generate_story', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ prompt })
-                });
-                if (!response.ok) {
-                    const err = await response.json().catch(() => ({ error: 'Server error' }));
-                    throw new Error(err.error || 'Failed to generate story');
-                }
-                const data = await response.json();
-                console.log(data.text);
-                console.log(data.audio_url);
-                // Save the story data (use direct URL from server)
-                storyData.currentScene = {
-                    text: data.text,
-                    audioUrl: data.audio_url
-                };
-                
-                // Display the story
-                storyText.textContent = data.text;
-                
-                // Generate choices
-                await generateChoicesForCurrentScene();
-            } catch (error) {
-                console.error("Error generating story:", error);
-                throw error;
-            }
-        }
+        const isCorrect = await confirmWithVoice('Did you say: ' + userPrompt + '? Please say yes or no.');
+        if(isCorrect){ status.textContent = 'Generating your story...'; startBtn.disabled = true; await generateStory(userPrompt); storySection.style.display = 'block'; status.textContent = 'Story ready!'; }
+        else { status.textContent = "Let's try again. Press the button and speak your story idea"; }
+      }catch(e){ console.error('Error in voice interaction:', e); status.textContent = 'An error occurred. Please try again.'; }
+    }
 
-        async function getDataAudio(abc) {
-            let data=null;
-            try {
-                const response = await fetch(abc);
-                data = await response.blob();
-            }
-            catch(error){
-                console.error("Error fetching data:", error);
-                throw error;
-            }
-            //console.log(data);
-            return data;
-        }
-        
-        // Generate choices for the current scene
-        async function generateChoicesForCurrentScene() {
-            try {
-                const response = await fetch('/api/generate_choices', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ story: storyData.currentScene.text })
-                });
-                if (!response.ok) {
-                    const err = await response.json().catch(() => ({ error: 'Server error' }));
-                    throw new Error(err.error || 'Failed to generate choices');
-                }
-                const data = await response.json();
-                storyData.choices = data.choices;
-                
-                // Display the choices
-                displayChoices();
-            } catch (error) {
-                console.error("Error generating choices:", error);
-                throw error;
-            }
-        }
-        
-        // Display the choices to the user
-        function displayChoices() {
+    async function captureVoiceInput(){
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+        const chunks = []; const rec = new MediaRecorder(stream);
+        const done = new Promise(res=>rec.addEventListener('stop',()=>res(chunks)));
+        rec.addEventListener('dataavailable', e=>chunks.push(e.data));
+        rec.start(); setTimeout(()=>{ if(rec.state!=='inactive') rec.stop(); }, 5000);
+        const audioChunks = await done; stream.getTracks().forEach(t=>t.stop());
+        if(audioChunks.length===0) return null;
+        const audioBlob = new Blob(audioChunks, { type:'audio/wav' });
+        const formData = new FormData(); formData.append('audio', audioBlob, 'recording.wav');
+        const resp = await fetch('/api/process_voice', { method:'POST', body: formData });
+        const data = await resp.json(); return data.text;
+      }catch(e){ console.error('Error capturing voice:', e); return null; }
+    }
+
+    async function confirmWithVoice(message){ await speak(message); const r = await captureVoiceInput(); return r ? r.toLowerCase().includes('yes') : false; }
+
+    async function generateStory(prompt){
+      const r = await fetch('/api/generate_story', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ prompt }) });
+      if(!r.ok){ const e = await r.json().catch(()=>({error:'Server error'})); throw new Error(e.error||'Failed to generate story'); }
+      const data = await r.json(); storyData.currentScene = { text: data.text, audioUrl: data.audio_url }; storyText.textContent = data.text; await generateChoicesForCurrentScene();
+    }
+
+    async function generateChoicesForCurrentScene(){
+      const r = await fetch('/api/generate_choices', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ story: storyData.currentScene.text }) });
+      if(!r.ok){ const e = await r.json().catch(()=>({error:'Server error'})); throw new Error(e.error||'Failed to generate choices'); }
+      const data = await r.json(); storyData.choices = data.choices; displayChoices();
+    }
+
+    function displayChoices(){
             choicesContainer.innerHTML = '';
-            
-            Object.keys(storyData.choices).forEach((choiceKey, index) => {
-                const choice = storyData.choices[choiceKey];
-                const choiceDiv = document.createElement('div');
-                choiceDiv.className = 'choice';
-                choiceDiv.textContent = `${index + 1}. ${choice.text}`;
-                
-                choiceDiv.addEventListener('click', () => {
-                    handleChoiceSelection(choiceKey);
-                });
-                
-                choicesContainer.appendChild(choiceDiv);
-            });
-        }
-        
-        // Handle user's choice selection
-        async function handleChoiceSelection(choiceKey) {
-            try {
-                status.textContent = "Continuing the story...";
-                
-                const response = await fetch('/api/continue_story', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        story: storyData.currentScene.text,
-                        choice: storyData.choices[choiceKey].text
-                    })
-                });
-                if (!response.ok) {
-                    const err = await response.json().catch(() => ({ error: 'Server error' }));
-                    throw new Error(err.error || 'Failed to continue story');
-                }
-                const data = await response.json();
-                
-                // Update the story data
-                storyData.currentScene = {
-                    text: data.text,
-                    audioUrl: data.audio_url
-                };
-                
-                // Display the new story segment
-                storyText.textContent = data.text;
+      Object.keys(storyData.choices).forEach((k,i)=>{
+        const c = storyData.choices[k]; const d = document.createElement('div'); d.className='choice'; d.textContent = `${i+1}. ${c.text}`; d.addEventListener('click',()=>handleChoiceSelection(k)); choicesContainer.appendChild(d);
+      });
+    }
 
+    async function handleChoiceSelection(key){
+      try{
+        status.textContent = 'Continuing the story...';
+        const r = await fetch('/api/continue_story', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ story: storyData.currentScene.text, choice: storyData.choices[key].text }) });
+        if(!r.ok){ const e = await r.json().catch(()=>({error:'Server error'})); throw new Error(e.error||'Failed to continue story'); }
+        const data = await r.json(); storyData.currentScene = { text: data.text, audioUrl: data.audio_url }; storyText.textContent = data.text; await generateChoicesForCurrentScene(); status.textContent='Story updated!';
+      }catch(e){ console.error('Error continuing story:', e); status.textContent='An error occurred. Please try again.'; }
+    }
 
-                
-                // Generate new choices
-                await generateChoicesForCurrentScene();
-                
-                status.textContent = "Story updated!";
-            } catch (error) {
-                console.error("Error continuing story:", error);
-                status.textContent = "An error occurred. Please try again.";
-            }
-        }
-        
-        // Play the current narration
-        async function playNarration() {
-            console.log(storyData.currentScene.audioUrl);
-            if (!storyData.currentScene.audioUrl) {
-                status.textContent = "No audio available to play";
-                return;
-            } 
-            
-            try {
-                stopAudio(); // Stop any currently playing audio
-                
-                status.textContent = "Playing narration...";
-                
-                // Fetch the audio file
-                const response = await fetch(storyData.currentScene.audioUrl);
-                const audioBlob = await response.blob();
-                const audioUrl = URL.createObjectURL(audioBlob);
-                
-                // Play the audio
-                currentAudio = new Audio(audioUrl);
-                currentAudio.play();
-                
-                currentAudio.addEventListener('ended', () => {
-                    status.textContent = "Narration complete";
-                    currentAudio = null;
-                });
-            } catch (error) {
-                console.error("Error playing narration:", error);
-                status.textContent = "Failed to play audio";
-            }
-        }
-        
-        // Stop currently playing audio
-        function stopAudio() {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-                currentAudio = null;
-                status.textContent = "Playback stopped";
-            }
-        }
-        
-        // Speak text using the Web Speech API
-        function speak(text) {
-            return new Promise((resolve) => {
-                if ('speechSynthesis' in window) {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.onend = resolve;
-                    speechSynthesis.speak(utterance);
-                } else {
-                    // Fallback if speech synthesis isn't available
-                    console.log("Speech synthesis not available");
-                    resolve();
-                }
-            });
-        }
+    async function playNarration(){
+      if(!storyData.currentScene?.audioUrl){ status.textContent='No audio available to play'; return; }
+      try{
+        stopAudio(); status.textContent='Playing narration...'; const b = await (await fetch(storyData.currentScene.audioUrl)).blob(); const url = URL.createObjectURL(b); const a = new Audio(url); currentAudio = a; a.play(); a.addEventListener('ended',()=>{ status.textContent='Narration complete'; currentAudio=null; });
+      }catch(e){ console.error('Error playing narration:', e); status.textContent='Failed to play audio'; }
+    }
+
+    function stopAudio(){ if(currentAudio){ currentAudio.pause(); currentAudio.currentTime=0; currentAudio=null; status.textContent='Playback stopped'; } }
+    function speak(text){ return new Promise(r=>{ if('speechSynthesis' in window){ const u = new SpeechSynthesisUtterance(text); u.onend=r; speechSynthesis.speak(u);} else r(); }); }
     </script>
 </body>
 </html>
