@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>audioleap.ai — Leap into immersive audio experiences</title>
-  <meta name="description" content="Automated narration, contextual SFX, mood BGM, and timestamp‑aware mixing — refined every time." />
-  <meta property="og:image" content="/static/logo.jpg" />
+  <title>audioleap.ai — Make stories that sound alive</title>
+  <meta name="description" content="Lifelike narration with smart SFX and BGM. Create immersive audio stories in minutes." />
+  <meta property="og:image" content="/static/logo_square_transparent.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -16,60 +16,94 @@
     }
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{
-      margin:0; color:var(--text);
-      background:var(--ink);
-      font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-    }
-    /* Parallax blobs */
-    .blob{position:fixed; inset:auto; filter:blur(80px); opacity:.35; z-index:-1; pointer-events:none; will-change:transform}
-    .blob.violet{background:#7c3aed; width:420px; height:420px; border-radius:50%; top:-120px; left:-120px}
-    .blob.teal{background:#14b8a6; width:520px; height:520px; border-radius:50%; bottom:-160px; right:-120px}
+    html{scroll-behavior:smooth}
+    body{margin:0; color:var(--text); background:var(--ink); font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale}
+
+    /* Parallax glows */
+    .blob{position:fixed; filter:blur(80px); opacity:.25; z-index:-1; pointer-events:none; will-change:transform}
+    .blob.violet{background:#7c3aed; width:480px; height:480px; border-radius:50%; top:-160px; left:-160px}
+    .blob.teal{background:#14b8a6; width:560px; height:560px; border-radius:50%; bottom:-220px; right:-140px}
 
     /* Layout */
-    .wrap{max-width:900px; margin:0 auto; padding:24px 20px 64px}
-    .nav{position:sticky; top:0; backdrop-filter:saturate(120%) blur(8px); background:linear-gradient(to bottom, rgba(10,8,20,.65), rgba(10,8,20,.2)); border-bottom:1px solid var(--border); z-index:10}
-    .nav-in{max-width:900px; margin:0 auto; padding:12px 20px; display:flex; align-items:center; justify-content:space-between}
-    .brand{display:flex; gap:12px; align-items:center}
-    .brand img{width:36px; height:36px; border-radius:10px; object-fit:cover; border:1px solid var(--border)}
-    .brand span{font:700 18px 'Space Grotesk',sans-serif; letter-spacing:.2px}
-    .cta{display:flex; gap:10px}
-    .btn{padding:12px 16px; border-radius:12px; font-weight:600; border:1px solid var(--border); background:rgba(255,255,255,.06); color:var(--text); cursor:pointer}
+    .nav{position:sticky; top:0; background:linear-gradient(to bottom, rgba(10,8,20,.7), rgba(10,8,20,.25)); backdrop-filter:saturate(120%) blur(8px); border-bottom:1px solid var(--border); z-index:20}
+    .nav-in{max-width:1120px; margin:0 auto; padding:12px 20px; display:flex; align-items:center; justify-content:space-between}
+    .brand{display:flex; gap:10px; align-items:center}
+    .brand img{height:36px; width:auto; object-fit:contain; border:none; border-radius:0; background:transparent; box-shadow:none}
+    .brand span{font:700 18px 'Space Grotesk',sans-serif}
+    .btn{padding:12px 16px; border-radius:12px; font-weight:600; border:1px solid var(--border); background:rgba(255,255,255,.06); color:var(--text); cursor:pointer; transition:transform .2s ease, box-shadow .25s ease, background .2s ease}
+    .btn:hover{transform:translateY(-1px); box-shadow:0 10px 24px rgba(109,40,217,.18)}
     .btn.primary{border-color:transparent; background:linear-gradient(135deg, var(--violet), var(--teal)); color:#fff}
 
+    .section{padding:72px 0; border-top:1px solid var(--border)}
+    .content{max-width:1120px; margin:0 auto; padding:0 20px}
+
     /* Hero */
-    .hero{padding:48px 0 12px}
-    .kicker{display:inline-block; padding:6px 10px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-weight:600; font-size:12px; letter-spacing:.3px}
-    h1{font:700 48px 'Space Grotesk',sans-serif; line-height:1.06; margin:14px 0 10px}
+    .hero{padding:86px 0 56px; border-top:none; position:relative; overflow:hidden}
+    .hero .content{text-align:center}
+    .logo-hero{width:120px; height:120px; object-fit:contain; border:none; border-radius:0; background:transparent; box-shadow:none; animation:floatY 6s ease-in-out infinite}
+    .kicker{display:inline-block; margin-top:16px; padding:6px 10px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-weight:600; font-size:12px; letter-spacing:.3px}
+    h1{font:700 56px 'Space Grotesk',sans-serif; line-height:1.05; margin:16px 0 12px}
     .grad{background:linear-gradient(135deg,#a78bfa 0%,#2dd4bf 100%); -webkit-background-clip:text; background-clip:text; color:transparent}
-    .lead{color:var(--muted); font-size:18px; line-height:1.7; margin:0}
-    .hero-cta{margin-top:22px; display:flex; gap:12px; flex-wrap:wrap}
+    .lead{color:var(--muted); font-size:18px; line-height:1.7; margin:0 auto; max-width:760px}
+    .caret{display:inline-block; width:2px; height:1em; background:currentColor; margin-left:3px; animation:blink 1s steps(1,end) infinite; vertical-align:-0.1em}
+    .hero-cta{margin-top:22px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap}
+    .beam{position:absolute; inset:auto; left:0; right:0; top:28%; height:1px; background:linear-gradient(90deg, transparent, rgba(167,139,250,.8), rgba(45,212,191,.8), transparent); filter:blur(1px); opacity:.25; animation:beam 5s linear infinite}
 
-    /* Sections */
-    section{padding:44px 0; border-top:1px solid var(--border)}
-    h2{font:700 26px 'Space Grotesk',sans-serif; margin:0 0 12px}
-    p{color:var(--muted); font-size:16px; line-height:1.85; margin:10px 0}
-    ul{margin:12px 0 0 0; padding:0; list-style:none}
-    li{display:flex; align-items:flex-start; gap:10px; margin:10px 0}
-    .dot{width:8px; height:8px; margin-top:10px; border-radius:50%; background:linear-gradient(135deg,var(--violet),var(--teal))}
+    /* Marquee */
+    .marquee{position:relative; overflow:hidden; opacity:.95; margin-top:28px}
+    .marquee::before, .marquee::after{content:""; position:absolute; top:0; bottom:0; width:96px; pointer-events:none; z-index:2}
+    .marquee::before{left:0; background:linear-gradient(to right, var(--ink) 0%, rgba(15,11,26,0) 100%)}
+    .marquee::after{right:0; background:linear-gradient(to left, var(--ink) 0%, rgba(15,11,26,0) 100%)}
+    .lane{display:flex; align-items:center; overflow:hidden}
+    .inner{display:flex; align-items:center; white-space:nowrap; min-width:100%; flex-shrink:0; will-change:transform}
+    .inner span{display:inline-block; padding:14px 28px; font-weight:600; font-size:16px; color:var(--muted)}
+    .marquee .inner{animation:marquee 24s linear infinite}
+    .marquee .inner:nth-child(2){animation:marquee 24s linear infinite; animation-delay:-12s}
 
-    .foot{text-align:center; color:var(--muted); padding-top:32px}
+    /* Feature cards */
+    .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+    .card{position:relative; border-radius:16px; padding:18px; background:rgba(255,255,255,.04); border:1px solid var(--border); overflow:hidden; transition:transform .2s ease, border-color .2s ease}
+    .card:hover{transform:translateY(-2px)}
+    .card::before{content:""; position:absolute; inset:0; background:radial-gradient(600px 160px at var(--mx,50%) -20%, rgba(109,40,217,.25), transparent 40%); opacity:.6; transition:.25s}
+    .card h3{font:700 18px 'Space Grotesk',sans-serif; margin:0 0 6px}
+    .card p{margin:0; color:var(--muted)}
 
-    /* Modal demo (kept minimal) */
+    /* CTA band */
+    .cta-band{background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02))}
+    .cta-box{border:1px solid var(--border); border-radius:16px; padding:18px; display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap}
+
+    /* Reveal */
+    .reveal{opacity:0; transform:translateY(12px); transition:opacity .6s ease, transform .6s ease}
+    .reveal.show{opacity:1; transform:none}
+
+    .foot{text-align:center; color:var(--muted); padding-top:36px}
+
+    /* Modal */
     .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(6,5,12,.6); backdrop-filter:blur(6px); z-index:50}
     .modal.show{display:flex}
-    .card{width:min(820px,92vw); max-height:90vh; overflow:auto; border:1px solid var(--border); background:rgba(23,18,37,.96); border-radius:16px}
+    .card-modal{width:min(820px,92vw); max-height:90vh; overflow:auto; border:1px solid var(--border); background:rgba(23,18,37,.96); border-radius:16px}
     .card-h{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border)}
     .close{background:transparent; border:none; color:var(--muted); font-size:20px; cursor:pointer}
     .card-b{padding:14px}
 
-    /* Inline demo styles overrides */
+    /* Demo overrides */
     .container{background:transparent; padding:0; box-shadow:none}
     .choice{background:#1e1a33; padding:10px; border-radius:8px}
     #storyText{background:#17132a; padding:12px; border-radius:10px}
 
-    @media (max-width:640px){h1{font-size:36px}}
+    @keyframes floatY{0%{transform:translateY(0)}50%{transform:translateY(-8px)}100%{transform:translateY(0)}}
+    @keyframes beam{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+    @keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-100%)} }
+    @keyframes blink{0%,100%{opacity:0}50%{opacity:1}}
+
+    /* Choice preview */
+    .choice-preview{display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center}
+    .pill-group{display:flex; gap:10px; flex-wrap:wrap}
+    .pill-btn{padding:10px 14px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,.06); color:var(--text); cursor:pointer; transition:background .2s ease, transform .2s ease}
+    .pill-btn:hover{transform:translateY(-1px)}
+    .pill-btn.active{background:linear-gradient(135deg, var(--violet), var(--teal)); border-color:transparent}
+    @media (max-width:960px){.grid{grid-template-columns:1fr 1fr} h1{font-size:42px}}
+    @media (max-width:640px){.grid{grid-template-columns:1fr} h1{font-size:34px} .logo-hero{width:92px; height:92px}}
     </style>
 </head>
 <body>
@@ -79,78 +113,97 @@
   <header class="nav">
     <div class="nav-in">
       <div class="brand">
-        <img src="/static/logo.jpg" alt="audioleap.ai" onerror="this.style.display='none'" />
+        <img src="/static/logo_square_transparent.png" alt="audioleap.ai" onerror="this.style.display='none'" />
         <span>audioleap.ai</span>
       </div>
-      <div class="cta">
+      <div style="display:flex; gap:10px">
         <button class="btn" id="openDemoTop">Launch demo</button>
         <a class="btn primary" href="mailto:hi@audioleap.ai">Get early access</a>
       </div>
     </div>
   </header>
 
-  <main class="wrap">
-    <section class="hero">
-      <span class="kicker">Leap into immersive audio experiences</span>
-      <h1>Re‑imagining audio production for creators — <span class="grad">fully automated</span>.</h1>
-      <p class="lead">We automate narration, ambience and SFX, mood‑aware BGM, and timestamp‑level mixing so your output is polished every single time.</p>
+  <section class="section hero">
+    <div class="content reveal">
+      <img src="/static/logo_square_transparent.png" alt="audioleap A logo" class="logo-hero" />
+      <span class="kicker">Leap into immersive audio</span>
+      <h1 id="typeTitle">Make stories that <span class="grad">sound alive</span></h1>
+      <p class="lead">Lifelike narration. Contextual SFX. Mood‑aware BGM. Create rich audio in minutes — not weeks.</p>
       <div class="hero-cta">
         <button class="btn primary" id="openDemo">Launch demo</button>
-        <a class="btn" href="#approach">Learn more</a>
+        <a class="btn" href="#features">Explore features</a>
       </div>
-    </section>
+      <div class="marquee" aria-hidden="true">
+        <div class="lane">
+          <div class="inner">
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+          </div>
+          <div class="inner" aria-hidden="true">
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+          </div>
+          <div class="inner" aria-hidden="true">
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+            <span>• Narration</span><span>• SFX</span><span>• BGM</span><span>• Mixing</span>
+          </div>
+        </div>
+      </div>
+      <div class="beam"></div>
+    </div>
+  </section>
 
-    <section id="challenge">
-      <h2>The challenge</h2>
-      <p>Creators, platforms and educators face high costs, slow turnaround and inconsistent quality. Audio defines 50–60% of the experience—yet most of it is still manual.</p>
-      <ul>
-        <li><span class="dot"></span><p>Cut production time from days to minutes.</p></li>
-        <li><span class="dot"></span><p>Achieve consistent, refined mixes at scale.</p></li>
-        <li><span class="dot"></span><p>Lower costs while improving quality.</p></li>
-      </ul>
-    </section>
+  <section class="section" id="features">
+    <div class="content">
+      <div class="grid">
+        <div class="card reveal" onmousemove="this.style.setProperty('--mx', (event.offsetX/this.clientWidth)*100+'%')">
+          <h3>AI narration</h3>
+          <p>Natural, expressive voiceovers that keep listeners hooked.</p>
+        </div>
+        <div class="card reveal" onmousemove="this.style.setProperty('--mx', (event.offsetX/this.clientWidth)*100+'%')">
+          <h3>Contextual sound</h3>
+          <p>Smart SFX and ambience placed exactly when the story needs it.</p>
+        </div>
+        <div class="card reveal" onmousemove="this.style.setProperty('--mx', (event.offsetX/this.clientWidth)*100+'%')">
+          <h3>Mood BGM</h3>
+          <p>Seamless background music with tasteful fades and transitions.</p>
+        </div>
+      </div>
+      <div class="choice-preview reveal" style="margin-top:28px">
+        <div style="color:var(--muted)">Your story. Your path.</div>
+        <div class="pill-group">
+          <button class="pill-btn active" onclick="previewChoice('Explore the forest')">Explore the forest</button>
+          <button class="pill-btn" onclick="previewChoice('Open the portal')">Open the portal</button>
+          <button class="pill-btn" onclick="previewChoice('Wait and listen')">Wait and listen</button>
+        </div>
+        <div id="choiceLine" style="max-width:720px; color:var(--text)"></div>
+      </div>
+    </div>
+  </section>
 
-    <section id="approach">
-      <h2>Our approach</h2>
-      <p>We combine DIA model narration from Nari Labs, OpenAI for story generation and timestamps, and HuggingFace Transformers for NLP on the text. The system mimics an editor’s workflow and renders reliably in Python.</p>
-      <ul>
-        <li><span class="dot"></span><p>Lifelike narration → parse text and words.</p></li>
-        <li><span class="dot"></span><p>Mood‑aware BGM with tasteful fades and transitions.</p></li>
-        <li><span class="dot"></span><p>Contextual ambience and SFX placed exactly on cue.</p></li>
-        <li><span class="dot"></span><p>Final mix exported, share‑ready.</p></li>
-      </ul>
-    </section>
-
-    <section id="market">
-      <h2>Market</h2>
-      <p>Creator economy ~₹ 927M (India) and $32B (global) and growing. Audiobooks ~ $9B and expanding as Gen Z shifts away from screens. Sound quality decides up to 50–60% of content success.</p>
-    </section>
-
-    <section id="users">
-      <h2>Who it’s for</h2>
-      <ul>
-        <li><span class="dot"></span><p>Businesses: Audible, KukuFM, PocketFM…</p></li>
-        <li><span class="dot"></span><p>Creators: interactive stories, narrative reels and videos.</p></li>
-        <li><span class="dot"></span><p>Education: narrated modules with ambience.</p></li>
-        <li><span class="dot"></span><p>Consumers: interactive stories and games.</p></li>
-      </ul>
-    </section>
-
-    <section style="text-align:center">
-      <h2>Ready to leap?</h2>
-      <p class="lead" style="margin-top:6px">Try the interactive demo or get early access for your team.</p>
-      <div style="margin-top:14px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
+  <section class="section cta-band">
+    <div class="content">
+      <div class="cta-box reveal">
+        <span style="color:var(--muted)">Ready to hear it?</span>
         <button class="btn primary" id="openDemoBottom">Launch demo</button>
         <a class="btn" href="mailto:hi@audioleap.ai">Get early access</a>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <div class="foot">© <span id="year"></span> audioleap.ai</div>
-  </main>
+  <section class="section">
+    <div class="content foot">© <span id="year"></span> audioleap.ai</div>
+  </section>
 
-  <!-- Demo Modal (kept minimal, uses your existing endpoints) -->
+  <!-- Demo Modal -->
   <div class="modal" id="demoModal" aria-hidden="true" role="dialog">
-    <div class="card">
+    <div class="card-modal">
       <div class="card-h"><strong>Interactive demo</strong><button class="close" id="closeDemo" aria-label="Close">✕</button></div>
       <div class="card-b">
     <div class="container">
@@ -177,7 +230,7 @@
   </div>
 
   <script>
-    // Parallax: move blobs on scroll (subtle, performant)
+    // Parallax glows
     const blobV = document.getElementById('blobV');
     const blobT = document.getElementById('blobT');
     const onScroll = () => {
@@ -188,7 +241,11 @@
     onScroll();
     window.addEventListener('scroll', onScroll, { passive:true });
 
-    // Modal wiring
+    // Reveal
+    const io = new IntersectionObserver((entries)=>{ entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('show'); } }); }, { threshold:0.12 });
+    document.querySelectorAll('.reveal, .card').forEach(el=>io.observe(el));
+
+    // Modal
     const modal = document.getElementById('demoModal');
     const openBtns = [document.getElementById('openDemoTop'), document.getElementById('openDemo'), document.getElementById('openDemoBottom')].filter(Boolean);
     const closeBtn = document.getElementById('closeDemo');
@@ -196,10 +253,60 @@
     closeBtn.addEventListener('click',()=>{ modal.classList.remove('show'); modal.setAttribute('aria-hidden','true'); });
     document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') modal.classList.remove('show');});
     document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Typewriter on first load
+    (function runTypewriter(){
+      const key = 'al_type_once_v1';
+      if (sessionStorage.getItem(key)) return; // only once per session
+      const el = document.getElementById('typeTitle');
+      if (!el) return;
+      const target = 'Make stories that ';
+      const colored = 'sound alive';
+      const span = document.createElement('span');
+      span.className = 'grad';
+      span.textContent = colored;
+      // start blank
+      el.textContent = '';
+      const caret = document.createElement('span');
+      caret.className = 'caret';
+      el.appendChild(caret);
+      let i = 0;
+      const typeBase = () => {
+        if (i < target.length){
+          caret.insertAdjacentText('beforebegin', target[i++]);
+          setTimeout(typeBase, 65);
+        } else {
+          caret.insertAdjacentText('beforebegin', ' ');
+          el.insertBefore(span, caret);
+          typeColored(0);
+        }
+      };
+      const typeColored = (j) => {
+        if (j <= colored.length){
+          span.textContent = colored.slice(0, j);
+          setTimeout(()=>typeColored(j+1), 90);
+        } else {
+          caret.remove();
+          sessionStorage.setItem(key, '1');
+        }
+      };
+      typeBase();
+    })();
+
+    // Choice preview line helper
+    const choiceLine = document.getElementById('choiceLine');
+    window.previewChoice = (label) => {
+      choiceLine.textContent = `“${label}” → audio adapts with narration, SFX and BGM in real‑time.`;
+      document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active'));
+      const btn = Array.from(document.querySelectorAll('.pill-btn')).find(b=>b.textContent===label);
+      if(btn) btn.classList.add('active');
+    };
+    // default state
+    window.previewChoice('Explore the forest');
   </script>
 
     <script>
-    // --- Existing demo logic (trimmed to essentials, unchanged behavior) ---
+    // Existing demo logic
         const startBtn = document.getElementById('startBtn');
         const storySection = document.getElementById('storySection');
         const storyText = document.getElementById('storyText');
