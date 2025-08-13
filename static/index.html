@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>audioleap.ai — Make stories that sound alive</title>
   <meta name="description" content="Lifelike narration with smart SFX and BGM. Create immersive audio stories in minutes." />
-  <meta property="og:image" content="/static/logo_square_transparent.png" />
+  <meta property="og:image" content="logo_square_transparent.png" />
+  <meta name="api-base" content="" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -113,7 +114,7 @@
   <header class="nav">
     <div class="nav-in">
       <div class="brand">
-        <img src="/static/logo_square_transparent.png" alt="audioleap.ai" onerror="this.style.display='none'" />
+        <img src="logo_square_transparent.png" alt="audioleap.ai" onerror="this.src='/static/logo_square_transparent.png'" />
         <span>audioleap.ai</span>
       </div>
       <div style="display:flex; gap:10px">
@@ -125,7 +126,7 @@
 
   <section class="section hero">
     <div class="content reveal">
-      <img src="/static/logo_square_transparent.png" alt="audioleap A logo" class="logo-hero" />
+      <img src="logo_square_transparent.png" alt="audioleap A logo" class="logo-hero" onerror="this.src='/static/logo_square_transparent.png'" />
       <span class="kicker">Leap into immersive audio</span>
       <h1 id="typeTitle">Make stories that <span class="grad">sound alive</span></h1>
       <p class="lead">Lifelike narration. Contextual SFX. Mood‑aware BGM. Create rich audio in minutes — not weeks.</p>
@@ -322,6 +323,14 @@
 
     const ensureInit = () => { if (!startBtn._bound) { init(); startBtn._bound = true; } };
 
+    // Resolve API base for deployments where the site root isn't "/KukuProject/static"
+    const API_BASE = (() => {
+      const meta = document.querySelector('meta[name="api-base"]');
+      const override = meta && meta.getAttribute('content');
+      if (override) return override;
+      return '';
+    })();
+
     function init(){
       if (!(window.AudioContext || window.webkitAudioContext)) { status.textContent = 'Web Audio API is not supported in your browser'; startBtn.disabled = true; return; }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status.textContent = 'Microphone access is not supported in your browser'; startBtn.disabled = true; return; }
@@ -369,13 +378,13 @@
     async function confirmWithVoice(message){ await speak(message); const r = await captureVoiceInput(); return r ? r.toLowerCase().includes('yes') : false; }
 
     async function generateStory(prompt){
-      const r = await fetch('/api/generate_story', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ prompt }) });
+      const r = await fetch(`${API_BASE}/api/generate_story`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ prompt }) });
       if(!r.ok){ const e = await r.json().catch(()=>({error:'Server error'})); throw new Error(e.error||'Failed to generate story'); }
       const data = await r.json(); storyData.currentScene = { text: data.text, audioUrl: data.audio_url }; storyText.textContent = data.text; await generateChoicesForCurrentScene();
     }
 
     async function generateChoicesForCurrentScene(){
-      const r = await fetch('/api/generate_choices', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ story: storyData.currentScene.text }) });
+      const r = await fetch(`${API_BASE}/api/generate_choices`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ story: storyData.currentScene.text }) });
       if(!r.ok){ const e = await r.json().catch(()=>({error:'Server error'})); throw new Error(e.error||'Failed to generate choices'); }
       const data = await r.json(); storyData.choices = data.choices; displayChoices();
     }
@@ -390,7 +399,7 @@
     async function handleChoiceSelection(key){
       try{
         status.textContent = 'Continuing the story...';
-        const r = await fetch('/api/continue_story', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ story: storyData.currentScene.text, choice: storyData.choices[key].text }) });
+        const r = await fetch(`${API_BASE}/api/continue_story`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ story: storyData.currentScene.text, choice: storyData.choices[key].text }) });
         if(!r.ok){ const e = await r.json().catch(()=>({error:'Server error'})); throw new Error(e.error||'Failed to continue story'); }
         const data = await r.json(); storyData.currentScene = { text: data.text, audioUrl: data.audio_url }; storyText.textContent = data.text; await generateChoicesForCurrentScene(); status.textContent='Story updated!';
       }catch(e){ console.error('Error continuing story:', e); status.textContent='An error occurred. Please try again.'; }
