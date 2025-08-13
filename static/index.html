@@ -330,6 +330,7 @@
       if (override) return override;
       return '';
     })();
+    const DEMO_MODE = !API_BASE;
 
     function init(){
       if (!(window.AudioContext || window.webkitAudioContext)) { status.textContent = 'Web Audio API is not supported in your browser'; startBtn.disabled = true; return; }
@@ -368,9 +369,12 @@
         rec.start(); setTimeout(()=>{ if(rec.state!=='inactive') rec.stop(); }, 5000);
         const audioChunks = await done; stream.getTracks().forEach(t=>t.stop());
         if(audioChunks.length===0) return null;
+        if (DEMO_MODE){
+          return 'a calm forest walk';
+        }
         const audioBlob = new Blob(audioChunks, { type:'audio/wav' });
         const formData = new FormData(); formData.append('audio', audioBlob, 'recording.wav');
-        const resp = await fetch('/api/process_voice', { method:'POST', body: formData });
+        const resp = await fetch(`${API_BASE}/api/process_voice`, { method:'POST', body: formData });
         const data = await resp.json(); return data.text;
       }catch(e){ console.error('Error capturing voice:', e); return null; }
     }
@@ -378,15 +382,39 @@
     async function confirmWithVoice(message){ await speak(message); const r = await captureVoiceInput(); return r ? r.toLowerCase().includes('yes') : false; }
 
     async function generateStory(prompt){
-      const r = await fetch(`${API_BASE}/api/generate_story`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ prompt }) });
-      if(!r.ok){ const e = await r.json().catch(()=>({error:'Server error'})); throw new Error(e.error||'Failed to generate story'); }
-      const data = await r.json(); storyData.currentScene = { text: data.text, audioUrl: data.audio_url }; storyText.textContent = data.text; await generateChoicesForCurrentScene();
+      try{
+        const r = await fetch(`${API_BASE}/api/generate_story`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ prompt }) });
+        if(!r.ok) throw new Error('bad');
+        const data = await r.json();
+        storyData.currentScene = { text: data.text, audioUrl: data.audio_url };
+        storyText.textContent = data.text;
+        await generateChoicesForCurrentScene();
+      }catch(e){
+        if (DEMO_MODE){
+          const text = `You chose: ${prompt || 'a mystery adventure'}. In a quiet grove, the wind carries whispers. A path splits ahead — and the story waits for your move.`;
+          storyData.currentScene = { text, audioUrl: null };
+          storyText.textContent = text;
+          await generateChoicesForCurrentScene();
+        } else {
+          throw e;
+        }
+      }
     }
 
     async function generateChoicesForCurrentScene(){
-      const r = await fetch(`${API_BASE}/api/generate_choices`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ story: storyData.currentScene.text }) });
-      if(!r.ok){ const e = await r.json().catch(()=>({error:'Server error'})); throw new Error(e.error||'Failed to generate choices'); }
-      const data = await r.json(); storyData.choices = data.choices; displayChoices();
+      try{
+        const r = await fetch(`${API_BASE}/api/generate_choices`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ story: storyData.currentScene.text }) });
+        if(!r.ok) throw new Error('bad');
+        const data = await r.json(); storyData.choices = data.choices; displayChoices();
+      }catch(e){
+        if (DEMO_MODE){
+          storyData.choices = {
+            choice1: { text: 'Follow the lantern glow', hint: 'curious' },
+            choice2: { text: 'Step through the humming portal', hint: 'epic' }
+          };
+          displayChoices();
+        } else { throw e; }
+      }
     }
 
     function displayChoices(){
@@ -400,9 +428,16 @@
       try{
         status.textContent = 'Continuing the story...';
         const r = await fetch(`${API_BASE}/api/continue_story`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ story: storyData.currentScene.text, choice: storyData.choices[key].text }) });
-        if(!r.ok){ const e = await r.json().catch(()=>({error:'Server error'})); throw new Error(e.error||'Failed to continue story'); }
+        if(!r.ok) throw new Error('bad');
         const data = await r.json(); storyData.currentScene = { text: data.text, audioUrl: data.audio_url }; storyText.textContent = data.text; await generateChoicesForCurrentScene(); status.textContent='Story updated!';
-      }catch(e){ console.error('Error continuing story:', e); status.textContent='An error occurred. Please try again.'; }
+      }catch(e){
+        if (DEMO_MODE){
+          const choiceText = storyData.choices[key].text;
+          const next = `You chose to ${choiceText.toLowerCase()}. The ambience shifts — a low drone swells, footsteps echo, and the narrator leans in as the world reacts to you.`;
+          storyData.currentScene = { text: next, audioUrl: null };
+          storyText.textContent = next; await generateChoicesForCurrentScene(); status.textContent='Story updated!';
+        } else { console.error('Error continuing story:', e); status.textContent='An error occurred. Please try again.'; }
+      }
     }
 
     async function playNarration(){
