@@ -5,10 +5,12 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable GPU detection
 import io
 import json
+import logging
 import tempfile
 from datetime import datetime
 from math import ceil
 from pathlib import Path
+from functools import wraps
 
 from dotenv import load_dotenv
 from faster_whisper import WhisperModel
@@ -17,33 +19,86 @@ from pydub import AudioSegment
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 
-#Get the absolute path to the directory containing app.py.
-base_dir = Path(__file__).parent
+# Import configuration
+try:
+    from config import Config
+except ImportError:
+    # Fallback if config.py doesn't exist
+    class Config:
+        BASE_DIR = Path(__file__).parent
+        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+        OPENAI_TIMEOUT = 30.0
+        HOST = "127.0.0.1"
+        PORT = 5000
+        DEBUG = False
+        MAX_PROMPT_LENGTH = 500
+        MAX_STORY_LENGTH = 5000
 
-# Load environment variables from key.env in the same directory.
-env_path = base_dir / "key.env"
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('server.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Load environment variables
+env_path = Config.BASE_DIR / "key.env"
 load_dotenv(env_path)
 
-# Initialize OpenAI client.
-api_key = os.getenv("OPENAI_API_KEY")
+# Validate configuration
+if hasattr(Config, 'validate'):
+    errors = Config.validate()
+    if errors:
+        for error in errors:
+            logger.error(f"Configuration error: {error}")
+        raise ValueError(f"Configuration errors: {', '.join(errors)}")
+
+# Initialize OpenAI client
+api_key = Config.OPENAI_API_KEY
 if not api_key:
     raise ValueError("OPENAI_API_KEY not configured. Set environment variable or add it to key.env")
+
 try:
-    client = OpenAI(api_key=api_key, timeout=30.0)
-except TypeError:
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=Config.OPENAI_TIMEOUT)
+    logger.info("OpenAI client initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize OpenAI client: {e}")
+    raise
 
+# Initialize Flask app
 app = Flask(__name__, static_folder='static')
-CORS(app)  #Enable CORS for all routes.
+CORS(app)  # Enable CORS for all routes
+logger.info("Flask app initialized")
 
-#Serve the main HTML page.
+# Error handler decorator
+def handle_errors(f):
+    """Decorator to handle errors in API endpoints."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except ValueError as e:
+            logger.warning(f"Validation error in {f.__name__}: {e}")
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            logger.error(f"Error in {f.__name__}: {e}", exc_info=True)
+            return jsonify({"error": "Internal server error"}), 500
+    return decorated_function
+
+# Serve the main HTML page
 @app.route('/')
 def serve_index():
+    """Serve the main application page."""
     return send_from_directory('static', 'index.html')
 
-#Serve static files (CSS, JS).
+# Serve static files (CSS, JS)
 @app.route('/static/<path:filename>')
 def serve_static(filename):
+    """Serve static assets."""
     return send_from_directory('static', filename)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -140,6 +195,7 @@ def process_voice_input(audio_file):
     """Transcribe user's voice input to text (CPU-only version)."""
     tmp_path = None
     try:
+        logger.info("Starting voice transcription")
         model = get_whisper_model("base")
 
         # Save temporary audio file
@@ -150,9 +206,10 @@ def process_voice_input(audio_file):
         # Transcribe
         segments, _ = model.transcribe(tmp_path)
         text = " ".join([seg.text for seg in segments])
+        logger.info(f"Transcription successful: {len(text)} characters")
         return text.strip()
     except Exception as e:
-        print(f"CPU Voice processing error: {e}")
+        logger.error(f"Voice processing error: {e}", exc_info=True)
         return None
     finally:
         if tmp_path and os.path.exists(tmp_path):
@@ -162,59 +219,93 @@ def process_voice_input(audio_file):
                 pass
 
 @app.route('/api/process_voice', methods=['POST'])
-
+@handle_errors
 def handle_voice():
+    """Process voice input and return transcribed text."""
     if 'audio' not in request.files:
-        return jsonify({"error": "No audio file"}), 400
+        logger.warning("Voice processing request missing audio file")
+        return jsonify({"error": "No audio file provided"}), 400
     
     audio_file = request.files['audio']
+    logger.info(f"Processing voice input: {audio_file.filename}")
+    
     text = process_voice_input(audio_file)
     
     if not text:
-        return jsonify({"error": "Processing failed"}), 500
+        logger.error("Voice processing failed to produce text")
+        return jsonify({"error": "Voice processing failed"}), 500
     
+    logger.info(f"Voice processed successfully: {text[:50]}...")
     return jsonify({"text": text})
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
+    """Health check endpoint with asset status."""
     try:
         bgm, sfx = load_audio_assets()
+        bgm_count = len([k for k, v in bgm.items() if v])
+        sfx_count = len([k for k, v in sfx.items() if v])
+        
+        logger.info(f"Health check: BGM={bgm_count}, SFX={sfx_count}")
+        
         return jsonify({
             "status": "ok",
-            "bgm_loaded": len([k for k, v in bgm.items() if v]),
-            "sfx_loaded": len([k for k, v in sfx.items() if v]),
+            "bgm_loaded": bgm_count,
+            "sfx_loaded": sfx_count,
+            "timestamp": datetime.now().isoformat()
         })
     except Exception as e:
+        logger.error(f"Health check failed: {e}")
         return jsonify({"status": "error", "detail": str(e)[:200]}), 500
 
 @app.route('/api/generate_story', methods=['POST'])
+@handle_errors
 def generate_story():
+    """Generate initial story from user prompt."""
     data = request.json
-    prompt = data.get('prompt')
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
     
+    prompt = data.get('prompt', '').strip()
+    
+    # Validate prompt
     if not prompt:
         return jsonify({"error": "No prompt provided"}), 400
+    
+    if len(prompt) > Config.MAX_PROMPT_LENGTH:
+        return jsonify({"error": f"Prompt too long (max {Config.MAX_PROMPT_LENGTH} characters)"}), 400
+    
+    logger.info(f"Generating story for prompt: {prompt[:50]}...")
     
     # Generate story text
     scene = generate_text(f"Write a 3-paragraph story introduction about: {prompt}")
     if not scene:
+        logger.error("Story text generation failed")
         return jsonify({"error": "Text generation failed"}), 502
 
     # Generate speech
+    logger.info("Generating speech from story text")
     audio_data = generate_speech(scene)
+    if not audio_data:
+        logger.error("Speech generation failed")
+        return jsonify({"error": "Speech generation failed"}), 502
 
     # Save files and process
     _, audio_path = save_files(scene, audio_data, "intro")
     if not audio_path or not os.path.exists(audio_path):
+        logger.error("Audio file save failed")
         return jsonify({"error": "Audio synthesis failed"}), 502
 
     # Transcribe, enrich and create final mix with BGM/SFX
+    logger.info("Creating final audio mix")
     enriched_data = transcribe_and_enrich(audio_path)
     audio_basename = os.path.basename(audio_path).replace('.mp3', '')
     final_path = save_final_output(audio_path, enriched_data, f"intro_{audio_basename}")
     if not final_path or not os.path.exists(final_path):
+        logger.error("Final audio rendering failed")
         return jsonify({"error": "Failed to render final audio"}), 500
 
+    logger.info(f"Story generated successfully: {os.path.basename(final_path)}")
     return jsonify({
         "text": scene,
         "audio_url": f"/api/audio/{os.path.basename(final_path)}"
@@ -222,39 +313,47 @@ def generate_story():
 
 @app.route('/api/audio/<filename>')
 def serve_audio(filename):
+    """Serve generated audio files."""
     filepath = os.path.join(FINAL_DIR, filename)
-    print(f"Serving audio from: {filepath}")  #Debug
+    logger.debug(f"Serving audio: {filepath}")
     
     if not os.path.exists(filepath):
-        print(f"❌ Audio file not found: {filename}",flush=True)
+        logger.warning(f"Audio file not found: {filename}")
         return jsonify({"error": "Audio file not found"}), 404
         
     return send_file(filepath, mimetype="audio/mp3")
 
 #TEXT AND AUDIO GENERATION
 def generate_text(prompt):
+    """Generate text using OpenAI GPT."""
     try:
+        logger.debug(f"Generating text for prompt: {prompt[:100]}...")
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
-        return response.choices[0].message.content
+        text = response.choices[0].message.content
+        logger.info(f"Text generated: {len(text)} characters")
+        return text
     except Exception as e:
-        print(f"Text Error: {str(e)[:200]}")
+        logger.error(f"Text generation error: {str(e)[:200]}", exc_info=True)
         return None
 
 def generate_speech(text, voice="alloy"):
+    """Generate speech audio using OpenAI TTS."""
     try:
+        logger.debug(f"Generating speech: {len(text)} characters")
         response = client.audio.speech.create(
             model="tts-1",
             voice=voice,
             input=text,
             response_format="mp3"
         )
+        logger.info("Speech generated successfully")
         return io.BytesIO(response.content)
     except Exception as e:
-        print(f"Audio Error: {str(e)[:200]}")
+        logger.error(f"Speech generation error: {str(e)[:200]}", exc_info=True)
         return None
 
 def save_files(content, audio_data, prefix):
@@ -638,37 +737,72 @@ def interactive_story():
         final_path = save_final_output(audio_path, enriched, f"ending_{audio_path.split('_')[-1].replace('.mp3','')}")
 
 @app.route('/api/generate_choices', methods=['POST'])
+@handle_errors
 def api_generate_choices():
+    """Generate story choices based on current story."""
     data = request.json
-    scene = data.get('story')
-    choices = generate_choices(scene)  # Using your existing function
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
+    scene = data.get('story', '').strip()
+    if not scene:
+        return jsonify({"error": "No story provided"}), 400
+    
+    logger.info(f"Generating choices for story: {scene[:50]}...")
+    choices = generate_choices(scene)
+    logger.info("Choices generated successfully")
     return jsonify({"choices": choices})
 
 @app.route('/api/continue_story', methods=['POST'])
+@handle_errors
 def continue_story():
+    """Continue story based on user choice."""
     data = request.json
-    previous_story = data.get('story')
-    choice = data.get('choice')
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
+    previous_story = data.get('story', '').strip()
+    choice = data.get('choice', '').strip()
+    
+    # Validate inputs
+    if not previous_story:
+        return jsonify({"error": "No previous story provided"}), 400
+    if not choice:
+        return jsonify({"error": "No choice provided"}), 400
+    
+    if len(previous_story) > Config.MAX_STORY_LENGTH:
+        return jsonify({"error": f"Story too long (max {Config.MAX_STORY_LENGTH} characters)"}), 400
+    
+    logger.info(f"Continuing story with choice: {choice[:50]}...")
     
     next_scene = generate_text(f"Continue the story after choosing: {choice}\n\n"
                              f"Previous:\n{previous_story}\n\nWrite 2-3 more paragraphs.")
     if not next_scene:
+        logger.error("Story continuation text generation failed")
         return jsonify({"error": "Text generation failed"}), 502
 
+    logger.info("Generating speech for continuation")
     audio_data = generate_speech(next_scene)
+    if not audio_data:
+        logger.error("Speech generation failed for continuation")
+        return jsonify({"error": "Speech generation failed"}), 502
     
     # Save files and process (using your existing functions)
     prefix = f"continuation_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     _, audio_path = save_files(next_scene, audio_data, prefix)
     if not audio_path or not os.path.exists(audio_path):
+        logger.error("Audio file save failed for continuation")
         return jsonify({"error": "Audio synthesis failed"}), 502
 
     # Transcribe, enrich and create final mix with BGM/SFX
+    logger.info("Creating final audio mix for continuation")
     enriched_data = transcribe_and_enrich(audio_path)
     final_path = save_final_output(audio_path, enriched_data, prefix)
     if not final_path or not os.path.exists(final_path):
+        logger.error("Final audio rendering failed for continuation")
         return jsonify({"error": "Failed to render final audio"}), 500
     
+    logger.info(f"Story continued successfully: {os.path.basename(final_path)}")
     return jsonify({
         "text": next_scene,
         "audio_url": f"/api/audio/{os.path.basename(final_path)}"
@@ -676,11 +810,23 @@ def continue_story():
 
 # --- RUN ---
 if __name__ == "__main__":
-    host = os.getenv("HOST", "127.0.0.1")
-    port_str = os.getenv("PORT", "5000")
+    logger.info("="*50)
+    logger.info("Starting AudioLeap Server")
+    logger.info("="*50)
+    
+    # Use Config for server settings
+    host = Config.HOST if hasattr(Config, 'HOST') else "127.0.0.1"
+    port = Config.PORT if hasattr(Config, 'PORT') else 5000
+    debug = Config.DEBUG if hasattr(Config, 'DEBUG') else False
+    
+    logger.info(f"Server configuration:")
+    logger.info(f"  Host: {host}")
+    logger.info(f"  Port: {port}")
+    logger.info(f"  Debug: {debug}")
+    logger.info(f"  OpenAI API Key: {'Configured' if api_key else 'Missing'}")
+    
     try:
-        port = int(port_str)
-    except ValueError:
-        port = 5000
-    debug = os.getenv("FLASK_DEBUG", "0") == "1"
-    app.run(host=host, port=port, debug=debug)
+        app.run(host=host, port=port, debug=debug)
+    except Exception as e:
+        logger.error(f"Server failed to start: {e}", exc_info=True)
+        raise

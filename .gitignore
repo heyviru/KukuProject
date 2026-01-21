@@ -1,4 +1,69 @@
-.venv/ 
-__pycache__/ 
-key.env 
-.DS_Store 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Environment Variables
+key.env
+.env
+*.env
+!.env.example
+!key.env.template
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+server.log
+logs/
+
+# Generated Audio Files (keep directory structure)
+Final/*.mp3
+Narrations/*.mp3
+Stories/*.txt
+!Final/.gitkeep
+!Narrations/.gitkeep
+!Stories/.gitkeep
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# OS
+Thumbs.db
